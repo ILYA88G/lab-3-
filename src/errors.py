@@ -14,7 +14,7 @@ class ItemNotFoundError(CatalogError):
     """Specified book wasn't found"""
 
 
-class UndupportedFormatVersionError(CatalogError):
+class UnsupportedFormatVersionError(CatalogError):
     """Unsupported JSON file version"""
 
 
