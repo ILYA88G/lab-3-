@@ -15,7 +15,7 @@ class Catalog:
             raise InvalidItemError("Объект должен быть книгой")
 
         if item.item_id in self._items:
-            raise DuplicateIDError(f"Книга с ID {item} уже существует")
+            raise DuplicateIDError(f"Книга с ID {item.item_id} уже существует")
 
         self._items[item.item_id] = item
 
