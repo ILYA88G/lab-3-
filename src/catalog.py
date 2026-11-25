@@ -1,4 +1,6 @@
+
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from .errors import (
     CatalogError,
@@ -15,6 +17,7 @@ class Catalog:
         self._items: dict[str, Book] = {}
         self._category_index: dict[str, list[str]] = {}
         self._undo_stack: list[tuple[str, Book, int]] = []
+        self._transaction_active = False
 
     def add(self, item: Book) -> None:
         """Add a book, update the index and record the operation."""
@@ -22,7 +25,9 @@ class Catalog:
             raise InvalidItemError("Объект должен быть книгой")
 
         if item.item_id in self._items:
-            raise DuplicateIDError(f"Книга с ID {item.item_id} уже существует")
+            raise DuplicateIDError(
+                f"Книга с ID {item.item_id} уже существует"
+            )
 
         self._items[item.item_id] = item
 
@@ -41,7 +46,9 @@ class Catalog:
             raise InvalidItemError("ID должен быть непустой строкой")
 
         if item_id not in self._items:
-            raise ItemNotFoundError(f"Книга с ID {item_id} не найдена")
+            raise ItemNotFoundError(
+                f"Книга с ID {item_id} не найдена"
+            )
 
         return self._items[item_id]
 
@@ -69,7 +76,10 @@ class Catalog:
         category = category.strip().casefold()
         book_ids = self._category_index.get(category, [])
 
-        return [self._items[item_id] for item_id in book_ids]
+        return [
+            self._items[item_id]
+            for item_id in book_ids
+        ]
 
     def find_by_name(self, query: str) -> list[Book]:
         """Find books by a case-insensitive name substring."""
@@ -81,7 +91,11 @@ class Catalog:
         if not query:
             return []
 
-        return [book for book in self._items.values() if query in book.name.casefold()]
+        return [
+            book
+            for book in self._items.values()
+            if query in book.name.casefold()
+        ]
 
     def __len__(self) -> int:
         """Return the number of books in the catalog."""
@@ -108,7 +122,16 @@ class Catalog:
             self._category_index[category].append(book.item_id)
 
     def undo(self) -> None:
-        """Undo the last successful catalog modification."""
+        """Undo the last operation outside a transaction."""
+        if self._transaction_active:
+            raise CatalogError(
+                "Нельзя вызывать undo() внутри транзакции"
+            )
+
+        self._undo_last()
+
+    def _undo_last(self) -> None:
+        """Reverse the last operation and restore the category index."""
         if not self._undo_stack:
             raise CatalogError("Нет операций для отмены")
 
@@ -123,6 +146,29 @@ class Catalog:
             self._items = dict(items)
 
         self._rebuild_category_index()
+
+    @contextmanager
+    def transaction(self) -> Iterator["Catalog"]:
+        """Commit catalog changes or roll them back on failure."""
+        if self._transaction_active:
+            raise CatalogError(
+                "Вложенные транзакции не поддерживаются"
+            )
+
+        self._transaction_active = True
+        checkpoint = len(self._undo_stack)
+
+        try:
+            yield self
+
+        except BaseException:
+            while len(self._undo_stack) > checkpoint:
+                self._undo_last()
+
+            raise
+
+        finally:
+            self._transaction_active = False
 
     def read_only_view(self) -> "CatalogReadOnlyView":
         """Return a read-only view of the catalog."""

@@ -1,14 +1,15 @@
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from src.catalog import Catalog
-from src.errors import DuplicateIDError, ItemNotFoundError
 from src.models import Book
-from src.storage import load_catalog, save_catalog
+from src.catalog import Catalog
+from src.storage import save_catalog, load_catalog
+from src.errors import DuplicateIDError, ItemNotFoundError
 
 
 def main() -> None:
-    """Demonstrate book catalog operations and JSON storage."""
+    """Demonstrate book catalog operations, JSON storage and transactions."""
 
     # Create an empty catalog
     catalog = Catalog()
@@ -20,7 +21,7 @@ def main() -> None:
         category="Роман",
         year=1869,
         author="Лев Толстой",
-        pages=1225,
+        pages=1225
     )
 
     book2 = Book(
@@ -29,7 +30,7 @@ def main() -> None:
         category="Антиутопия",
         year=1949,
         author="Джордж Оруэлл",
-        pages=328,
+        pages=328
     )
 
     book3 = Book(
@@ -38,7 +39,7 @@ def main() -> None:
         category="Роман",
         year=1967,
         author="Михаил Булгаков",
-        pages=480,
+        pages=480
     )
 
     # Add books to the catalog
@@ -74,7 +75,7 @@ def main() -> None:
     for book in catalog.find_by_name("война"):
         print(book.name)
 
-    # Check whether a book exists in the catalog
+    # Check book membership
     print("\nПроверка наличия книги:")
 
     if "book-2" in catalog:
@@ -112,8 +113,30 @@ def main() -> None:
     # Remove a book
     print("\nУдаление книги:")
     catalog.remove("book-2")
-
     print("Количество книг после удаления:", len(catalog))
+
+    # Demonstrate transaction rollback
+    print("\n=== ДЕМОНСТРАЦИЯ ТРАНЗАКЦИИ ===")
+    print("Количество книг до транзакции:", len(catalog))
+
+    try:
+        with catalog.transaction():
+            catalog.add(book2)
+            print("Внутри транзакции добавлена книга:", book2.name)
+
+            # Trigger a duplicate ID error
+            catalog.add(book1)
+
+    except DuplicateIDError as error:
+        print("Ошибка транзакции:", error)
+        print("Все изменения транзакции отменены")
+
+    print("Количество книг после отката:", len(catalog))
+
+    if "book-2" in catalog:
+        print("Книга с ID book-2 присутствует в каталоге")
+    else:
+        print("Книга с ID book-2 отсутствует в каталоге")
 
 
 if __name__ == "__main__":
