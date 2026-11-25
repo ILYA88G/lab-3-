@@ -255,3 +255,47 @@ def test_undo_empty_history():
 
     with pytest.raises(CatalogError):
         catalog.undo()
+
+
+def test_read_only_view():
+    """Check that the view provides read-only catalog operations."""
+    catalog = Catalog()
+    book = make_book("book-1", "Book A", "Novel")
+
+    catalog.add(book)
+    view = catalog.read_only_view()
+
+    assert len(view) == 1
+    assert view.get("book-1") == book
+    assert view.find_by_category("Novel") == [book]
+    assert view.find_by_name("BOOK") == [book]
+    assert "book-1" in view
+    assert list(view) == [book]
+
+    assert not hasattr(view, "add")
+    assert not hasattr(view, "remove")
+    assert not hasattr(view, "undo")
+
+
+def test_read_only_view_updates():
+    """Check that the view reflects catalog modifications."""
+    catalog = Catalog()
+    view = catalog.read_only_view()
+
+    book = make_book("book-1", "Book A", "Novel")
+
+    catalog.add(book)
+
+    assert len(view) == 1
+    assert view.get("book-1") == book
+
+    catalog.remove("book-1")
+
+    assert len(view) == 0
+    assert "book-1" not in view
+    assert view.find_by_category("Novel") == []
+
+    catalog.undo()
+
+    assert len(view) == 1
+    assert view.get("book-1") == book

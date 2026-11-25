@@ -27,7 +27,11 @@ class Catalog:
         self._items[item.item_id] = item
 
         category = item.category.strip().casefold()
-        self._category_index.setdefault(category, []).append(item.item_id)
+
+        if category not in self._category_index:
+            self._category_index[category] = []
+
+        self._category_index[category].append(item.item_id)
 
         self._undo_stack.append(("add", item, -1))
 
@@ -97,7 +101,11 @@ class Catalog:
 
         for book in self._items.values():
             category = book.category.strip().casefold()
-            self._category_index.setdefault(category, []).append(book.item_id)
+
+            if category not in self._category_index:
+                self._category_index[category] = []
+
+            self._category_index[category].append(book.item_id)
 
     def undo(self) -> None:
         """Undo the last successful catalog modification."""
@@ -115,3 +123,37 @@ class Catalog:
             self._items = dict(items)
 
         self._rebuild_category_index()
+
+    def read_only_view(self) -> "CatalogReadOnlyView":
+        """Return a read-only view of the catalog."""
+        return CatalogReadOnlyView(self)
+
+
+class CatalogReadOnlyView:
+    def __init__(self, catalog: Catalog):
+        """Create a read-only view of an existing catalog."""
+        self.__catalog = catalog
+
+    def get(self, item_id: str) -> Book:
+        """Return a book by its unique ID."""
+        return self.__catalog.get(item_id)
+
+    def find_by_category(self, category: str) -> list[Book]:
+        """Find books matching the specified category."""
+        return self.__catalog.find_by_category(category)
+
+    def find_by_name(self, query: str) -> list[Book]:
+        """Find books matching the specified name query."""
+        return self.__catalog.find_by_name(query)
+
+    def __len__(self) -> int:
+        """Return the number of books in the catalog."""
+        return len(self.__catalog)
+
+    def __iter__(self) -> Iterator[Book]:
+        """Iterate over books in their insertion order."""
+        return iter(self.__catalog)
+
+    def __contains__(self, item_id: str) -> bool:
+        """Check whether a book ID exists in the catalog."""
+        return item_id in self.__catalog
