@@ -25,7 +25,7 @@ def make_book(item_id: str = "item-7319") -> Book:
 
 
 def test_save_catalog(tmp_path):
-    """Check that catalog data is correctly saved to JSON."""
+    """Check that catalog data is saved in format version 2."""
     catalog = Catalog()
     book = make_book()
     catalog.add(book)
@@ -36,11 +36,14 @@ def test_save_catalog(tmp_path):
     with open(path, "r", encoding="utf-8") as file:
         data = json.load(file)
 
-    assert data["format_version"] == 1
-    assert len(data["books"]) == 1
-    assert data["books"][0]["item_id"] == "item-7319"
-    assert data["books"][0]["name"] == "Война и мир"
-    assert data["books"][0]["pages"] == 1225
+    assert data["format_version"] == 2
+    assert len(data["catalog"]["books"]) == 1
+
+    saved_book = data["catalog"]["books"][0]
+
+    assert saved_book["item_id"] == "item-7319"
+    assert saved_book["name"] == "Война и мир"
+    assert saved_book["pages"] == 1225
 
 
 def test_round_trip(tmp_path):
@@ -157,3 +160,51 @@ def test_no_partial_modification(tmp_path):
     assert existing_catalog.get("original-1") == original_book
     assert "book-1" not in existing_catalog
     assert "book-2" not in existing_catalog
+
+def test_migrate_v1_to_v2(tmp_path):
+    """Check that version 1 data can be loaded and saved as version 2."""
+    old_path = tmp_path / "old_catalog.json"
+    new_path = tmp_path / "new_catalog.json"
+
+    book = make_book("book-1")
+
+    old_data = {
+        "format_version": 1,
+        "books": [asdict(book)]
+    }
+
+    old_path.write_text(
+        json.dumps(old_data, ensure_ascii=False),
+        encoding="utf-8"
+    )
+
+    loaded_catalog = load_catalog(old_path)
+
+    assert loaded_catalog.get("book-1") == book
+
+    save_catalog(loaded_catalog, new_path)
+
+    with open(new_path, "r", encoding="utf-8") as file:
+        new_data = json.load(file)
+
+    assert new_data["format_version"] == 2
+    assert new_data["catalog"]["books"] == [asdict(book)]
+
+def test_invalid_v2_structure(tmp_path):
+    """Check that an invalid version 2 document is rejected."""
+    path = tmp_path / "invalid_v2.json"
+
+    data = {
+        "format_version": 2,
+        "catalog": {
+            "books": "invalid"
+        }
+    }
+
+    path.write_text(
+        json.dumps(data),
+        encoding="utf-8"
+    )
+
+    with pytest.raises(CorruptedFileError):
+        load_catalog(path)
