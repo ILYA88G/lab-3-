@@ -8,6 +8,7 @@ class Catalog:
     def __init__(self):
         """Initialization of books' catalog"""
         self._items: dict[str, Book] = {}
+        self._category_index: dict[str, list[str]] = {}
 
     def add(self, item: Book) -> None:
         """Adds book to catalog in case of unic ID"""
@@ -19,6 +20,13 @@ class Catalog:
 
         self._items[item.item_id] = item
 
+        category = item.category.strip().casefold()
+
+        if category not in self._category_index:
+            self._category_index[category] = []
+
+        self._category_index[category].append(item.item_id)
+
     def get(self, item_id: str) -> Book:
         """Returns a book by its unique ID"""
         if item_id not in self._items:
@@ -26,15 +34,22 @@ class Catalog:
         return self._items[item_id]
 
     def remove(self, item_id: str) -> None:
-        """Removes a book by its ID or raise error if ID not found"""
+        """Remove a book and update the category index"""
         if item_id not in self._items:
-            raise ItemNotFoundError(
-                f"Книги с ID {item_id} заведомо не существует в каталоге"
-            )
+            raise ItemNotFoundError(f"Книга с ID {item_id} не найдена")
+
+        book = self._items[item_id]
+        category = book.category.strip().casefold()
+
         del self._items[item_id]
 
+        self._category_index[category].remove(item_id)
+
+        if not self._category_index[category]:
+            del self._category_index[category]
+
     def find_by_category(self, category: str) -> list[Book]:
-        """Returns books matching a category, ignoring case"""
+        """Finds books"""
         if not isinstance(category, str):
             raise TypeError("Категория должна быть строкой")
 

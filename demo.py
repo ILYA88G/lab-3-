@@ -1,11 +1,10 @@
-
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from src.models import Book
 from src.catalog import Catalog
-from src.storage import save_catalog, load_catalog
 from src.errors import DuplicateIDError, ItemNotFoundError
+from src.models import Book
+from src.storage import load_catalog, save_catalog
 
 
 def main() -> None:
@@ -21,7 +20,7 @@ def main() -> None:
         category="Роман",
         year=1869,
         author="Лев Толстой",
-        pages=1225
+        pages=1225,
     )
 
     book2 = Book(
@@ -30,7 +29,7 @@ def main() -> None:
         category="Антиутопия",
         year=1949,
         author="Джордж Оруэлл",
-        pages=328
+        pages=328,
     )
 
     book3 = Book(
@@ -39,7 +38,7 @@ def main() -> None:
         category="Роман",
         year=1967,
         author="Михаил Булгаков",
-        pages=480
+        pages=480,
     )
 
     # Add books to the catalog

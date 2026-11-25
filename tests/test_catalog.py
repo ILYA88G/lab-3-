@@ -154,3 +154,49 @@ def test_get_missing_id():
 
     with pytest.raises(ItemNotFoundError):
         catalog.get("book-999")
+
+
+def test_category_index_after_add():
+    """Check that added books appear in the category index."""
+    catalog = Catalog()
+
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-2", "Book B", "Novel")
+
+    catalog.add(book1)
+    catalog.add(book2)
+
+    assert catalog.find_by_category("NOVEL") == [book1, book2]
+
+
+def test_category_index_after_remove():
+    """Check that removed books disappear from the category index."""
+    catalog = Catalog()
+
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-2", "Book B", "Novel")
+
+    catalog.add(book1)
+    catalog.add(book2)
+
+    catalog.remove("book-1")
+
+    assert catalog.find_by_category("Novel") == [book2]
+
+    catalog.remove("book-2")
+
+    assert catalog.find_by_category("Novel") == []
+
+
+def test_category_index_after_duplicate():
+    """Check that duplicate insertion does not change the index."""
+    catalog = Catalog()
+
+    book = make_book("book-1", "Book A", "Novel")
+    catalog.add(book)
+
+    with pytest.raises(DuplicateIDError):
+        catalog.add(book)
+
+    assert catalog.find_by_category("Novel") == [book]
+    assert len(catalog) == 1
