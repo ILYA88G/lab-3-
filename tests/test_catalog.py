@@ -1,7 +1,7 @@
 import pytest
 
 from src.catalog import Catalog
-from src.errors import DuplicateIDError, ItemNotFoundError
+from src.errors import CatalogError, DuplicateIDError, ItemNotFoundError
 from src.models import Book
 
 
@@ -200,3 +200,58 @@ def test_category_index_after_duplicate():
 
     assert catalog.find_by_category("Novel") == [book]
     assert len(catalog) == 1
+
+
+def test_undo_add():
+    """Check that undo removes the last added book."""
+    catalog = Catalog()
+    book = make_book("book-1", "Book A", "Novel")
+
+    catalog.add(book)
+    catalog.undo()
+
+    assert len(catalog) == 0
+    assert "book-1" not in catalog
+    assert catalog.find_by_category("Novel") == []
+
+
+def test_undo_remove():
+    """Check that undo restores a removed book and its position."""
+    catalog = Catalog()
+
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-2", "Book B", "Novel")
+    book3 = make_book("book-3", "Book C", "Fantasy")
+
+    catalog.add(book1)
+    catalog.add(book2)
+    catalog.add(book3)
+
+    catalog.remove("book-1")
+    catalog.undo()
+
+    assert list(catalog) == [book1, book2, book3]
+    assert catalog.find_by_category("Novel") == [book1, book2]
+
+
+def test_undo_after_failed_add():
+    """Check that a failed insertion is not recorded in undo history."""
+    catalog = Catalog()
+    book = make_book("book-1", "Book A", "Novel")
+
+    catalog.add(book)
+
+    with pytest.raises(DuplicateIDError):
+        catalog.add(book)
+
+    catalog.undo()
+
+    assert len(catalog) == 0
+
+
+def test_undo_empty_history():
+    """Check that undo raises an error when history is empty."""
+    catalog = Catalog()
+
+    with pytest.raises(CatalogError):
+        catalog.undo()
