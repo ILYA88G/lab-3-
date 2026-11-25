@@ -1,13 +1,12 @@
-
 import pytest
 
 from src.catalog import Catalog
-from src.models import Book
 from src.errors import (
     CatalogError,
     DuplicateIDError,
     ItemNotFoundError,
 )
+from src.models import Book
 
 
 def make_book(item_id: str, name: str, category: str) -> Book:
@@ -18,7 +17,7 @@ def make_book(item_id: str, name: str, category: str) -> Book:
         category=category,
         year=2000,
         author="Test Author",
-        pages=300
+        pages=300,
     )
 
 
@@ -34,14 +33,18 @@ def test_add_and_get():
 
 
 def test_duplicate_id():
-    """Check that adding a duplicate ID raises an error."""
+    """Check that different books cannot share the same ID."""
     catalog = Catalog()
-    book = make_book("book-1", "War and Peace", "Novel")
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-1", "Book B", "Fantasy")
 
-    catalog.add(book)
+    catalog.add(book1)
 
     with pytest.raises(DuplicateIDError):
-        catalog.add(book)
+        catalog.add(book2)
+
+    assert len(catalog) == 1
+    assert catalog.get("book-1") == book1
 
 
 def test_remove():
@@ -123,6 +126,19 @@ def test_search_returns_independent_list():
     catalog.add(book)
 
     results = catalog.find_by_category("Novel")
+    results.clear()
+
+    assert len(catalog) == 1
+    assert catalog.get("book-1") == book
+
+
+def test_name_search_returns_independent_list():
+    """Check that name search results cannot modify the catalog."""
+    catalog = Catalog()
+    book = make_book("book-1", "Book A", "Novel")
+    catalog.add(book)
+
+    results = catalog.find_by_name("Book")
     results.clear()
 
     assert len(catalog) == 1
@@ -305,11 +321,10 @@ def test_transaction_rollback():
 
     catalog.add(original)
 
-    with pytest.raises(DuplicateIDError):
-        with catalog.transaction():
-            catalog.remove("book-1")
-            catalog.add(new_book)
-            catalog.add(new_book)
+    with pytest.raises(DuplicateIDError), catalog.transaction():
+        catalog.remove("book-1")
+        catalog.add(new_book)
+        catalog.add(new_book)
 
     assert list(catalog) == [original]
     assert catalog.find_by_category("Novel") == [original]
@@ -325,10 +340,9 @@ def test_transaction_preserves_undo_history():
 
     catalog.add(book1)
 
-    with pytest.raises(RuntimeError):
-        with catalog.transaction():
-            catalog.add(book2)
-            raise RuntimeError("Test failure")
+    with pytest.raises(RuntimeError), catalog.transaction():
+        catalog.add(book2)
+        raise RuntimeError("Test failure")
 
     assert list(catalog) == [book1]
 
@@ -342,10 +356,9 @@ def test_undo_inside_transaction():
     catalog = Catalog()
     book = make_book("book-1", "Book A", "Novel")
 
-    with pytest.raises(CatalogError):
-        with catalog.transaction():
-            catalog.add(book)
-            catalog.undo()
+    with pytest.raises(CatalogError), catalog.transaction():
+        catalog.add(book)
+        catalog.undo()
 
     assert len(catalog) == 0
 
@@ -355,11 +368,67 @@ def test_nested_transactions():
     catalog = Catalog()
     book = make_book("book-1", "Book A", "Novel")
 
-    with pytest.raises(CatalogError):
-        with catalog.transaction():
-            catalog.add(book)
+    with pytest.raises(CatalogError), catalog.transaction():
+        catalog.add(book)
 
-            with catalog.transaction():
-                pass
+        with catalog.transaction():
+            pass
 
     assert len(catalog) == 0
+
+
+def test_rollback_restores_order_and_index():
+    """Check that rollback restores book order and category index."""
+    catalog = Catalog()
+
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-2", "Book B", "Fantasy")
+    book3 = make_book("book-3", "Book C", "Novel")
+    book4 = make_book("book-4", "Book D", "Fantasy")
+
+    catalog.add(book1)
+    catalog.add(book2)
+    catalog.add(book3)
+
+    with pytest.raises(RuntimeError), catalog.transaction():
+        catalog.remove("book-2")
+        catalog.add(book4)
+        raise RuntimeError("Test rollback")
+
+    assert list(catalog) == [book1, book2, book3]
+    assert catalog.find_by_category("Fantasy") == [book2]
+    assert catalog.find_by_category("Novel") == [book1, book3]
+
+
+def test_transaction_after_rollback():
+    """Check that a new transaction works after a rollback."""
+    catalog = Catalog()
+
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-2", "Book B", "Fantasy")
+
+    with pytest.raises(RuntimeError), catalog.transaction():
+        catalog.add(book1)
+        raise RuntimeError("Test failure")
+
+    with catalog.transaction():
+        catalog.add(book2)
+
+    assert list(catalog) == [book2]
+
+
+def test_undo_after_committed_transaction():
+    """Check that undo works after a successful transaction."""
+    catalog = Catalog()
+
+    book1 = make_book("book-1", "Book A", "Novel")
+    book2 = make_book("book-2", "Book B", "Novel")
+
+    with catalog.transaction():
+        catalog.add(book1)
+        catalog.add(book2)
+
+    catalog.undo()
+
+    assert list(catalog) == [book1]
+    assert catalog.find_by_category("Novel") == [book1]

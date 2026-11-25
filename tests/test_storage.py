@@ -71,7 +71,10 @@ def test_corrupted_json(tmp_path):
     """Check that malformed JSON raises CorruptedFileError."""
     path = tmp_path / "broken.json"
 
-    path.write_text('{"format_version": 1, "books": [', encoding="utf-8")
+    path.write_text(
+        '{"format_version": 1, "books": [',
+        encoding="utf-8",
+    )
 
     with pytest.raises(CorruptedFileError):
         load_catalog(path)
@@ -81,7 +84,10 @@ def test_unsupported_version(tmp_path):
     """Check that unsupported JSON versions are rejected."""
     path = tmp_path / "catalog.json"
 
-    path.write_text('{"format_version": 99, "books": []}', encoding="utf-8")
+    path.write_text(
+        '{"format_version": 99, "books": []}',
+        encoding="utf-8",
+    )
 
     with pytest.raises(UnsupportedFormatVersionError):
         load_catalog(path)
@@ -91,7 +97,10 @@ def test_missing_format_version(tmp_path):
     """Check that a missing format version is rejected."""
     path = tmp_path / "catalog.json"
 
-    path.write_text('{"books": []}', encoding="utf-8")
+    path.write_text(
+        '{"books": []}',
+        encoding="utf-8",
+    )
 
     with pytest.raises(CorruptedFileError):
         load_catalog(path)
@@ -101,7 +110,10 @@ def test_invalid_books_structure(tmp_path):
     """Check that books must be stored as a list."""
     path = tmp_path / "catalog.json"
 
-    path.write_text('{"format_version": 1, "books": "invalid"}', encoding="utf-8")
+    path.write_text(
+        '{"format_version": 1, "books": "invalid"}',
+        encoding="utf-8",
+    )
 
     with pytest.raises(CorruptedFileError):
         load_catalog(path)
@@ -114,9 +126,15 @@ def test_invalid_book_data(tmp_path):
     book_data = asdict(make_book())
     book_data["pages"] = -100
 
-    data = {"format_version": 1, "books": [book_data]}
+    data = {
+        "format_version": 1,
+        "books": [book_data],
+    }
 
-    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(data, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     with pytest.raises(CorruptedFileError):
         load_catalog(path)
@@ -128,16 +146,22 @@ def test_duplicate_ids_in_json(tmp_path):
 
     book_data = asdict(make_book())
 
-    data = {"format_version": 1, "books": [book_data, book_data]}
+    data = {
+        "format_version": 1,
+        "books": [book_data, book_data],
+    }
 
-    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(data, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     with pytest.raises(CorruptedFileError):
         load_catalog(path)
 
 
 def test_no_partial_modification(tmp_path):
-    """Check that failed loading leaves an existing catalog unchanged."""
+    """Check that failed loading does not modify an existing catalog."""
     existing_catalog = Catalog()
 
     original_book = make_book("original-1")
@@ -147,19 +171,27 @@ def test_no_partial_modification(tmp_path):
     invalid_book = asdict(make_book("book-2"))
     invalid_book["pages"] = -50
 
-    data = {"format_version": 1, "books": [valid_book, invalid_book]}
+    data = {
+        "format_version": 1,
+        "books": [valid_book, invalid_book],
+    }
 
     path = tmp_path / "catalog.json"
 
-    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(data, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
-    with pytest.raises(CorruptedFileError):
+    with pytest.raises(CorruptedFileError, match="индексом 1"):
         load_catalog(path)
 
     assert len(existing_catalog) == 1
+    assert list(existing_catalog) == [original_book]
     assert existing_catalog.get("original-1") == original_book
     assert "book-1" not in existing_catalog
     assert "book-2" not in existing_catalog
+
 
 def test_migrate_v1_to_v2(tmp_path):
     """Check that version 1 data can be loaded and saved as version 2."""
@@ -170,12 +202,12 @@ def test_migrate_v1_to_v2(tmp_path):
 
     old_data = {
         "format_version": 1,
-        "books": [asdict(book)]
+        "books": [asdict(book)],
     }
 
     old_path.write_text(
         json.dumps(old_data, ensure_ascii=False),
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     loaded_catalog = load_catalog(old_path)
@@ -190,6 +222,7 @@ def test_migrate_v1_to_v2(tmp_path):
     assert new_data["format_version"] == 2
     assert new_data["catalog"]["books"] == [asdict(book)]
 
+
 def test_invalid_v2_structure(tmp_path):
     """Check that an invalid version 2 document is rejected."""
     path = tmp_path / "invalid_v2.json"
@@ -197,13 +230,44 @@ def test_invalid_v2_structure(tmp_path):
     data = {
         "format_version": 2,
         "catalog": {
-            "books": "invalid"
-        }
+            "books": "invalid",
+        },
     }
 
     path.write_text(
         json.dumps(data),
-        encoding="utf-8"
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CorruptedFileError):
+        load_catalog(path)
+
+
+def test_invalid_root_type(tmp_path):
+    """Check that the JSON root must be an object."""
+    path = tmp_path / "invalid_root.json"
+
+    path.write_text(
+        "[]",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CorruptedFileError):
+        load_catalog(path)
+
+
+def test_boolean_format_version(tmp_path):
+    """Check that a boolean is rejected as a format version."""
+    path = tmp_path / "boolean_version.json"
+
+    data = {
+        "format_version": True,
+        "books": [],
+    }
+
+    path.write_text(
+        json.dumps(data),
+        encoding="utf-8",
     )
 
     with pytest.raises(CorruptedFileError):

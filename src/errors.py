@@ -1,22 +1,22 @@
 class CatalogError(Exception):
-    """Basic catalog error"""
+    """Base exception for catalog errors."""
 
 
 class InvalidItemError(CatalogError):
-    """Incorrect book data"""
+    """Raised when book data is invalid."""
 
 
 class DuplicateIDError(CatalogError):
-    """The existance of book with the same ID"""
+    """Raised when a book with the same ID already exists."""
 
 
 class ItemNotFoundError(CatalogError):
-    """Specified book wasn't found"""
+    """Raised when a requested book is not found."""
 
 
 class UnsupportedFormatVersionError(CatalogError):
-    """Unsupported JSON file version"""
+    """Raised when the JSON format version is unsupported."""
 
 
 class CorruptedFileError(CatalogError):
-    """Corrupted catalog file"""
+    """Raised when catalog file data is corrupted."""

@@ -1,4 +1,3 @@
-
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -25,9 +24,7 @@ class Catalog:
             raise InvalidItemError("Объект должен быть книгой")
 
         if item.item_id in self._items:
-            raise DuplicateIDError(
-                f"Книга с ID {item.item_id} уже существует"
-            )
+            raise DuplicateIDError(f"Книга с ID {item.item_id} уже существует")
 
         self._items[item.item_id] = item
 
@@ -46,9 +43,7 @@ class Catalog:
             raise InvalidItemError("ID должен быть непустой строкой")
 
         if item_id not in self._items:
-            raise ItemNotFoundError(
-                f"Книга с ID {item_id} не найдена"
-            )
+            raise ItemNotFoundError(f"Книга с ID {item_id} не найдена")
 
         return self._items[item_id]
 
@@ -76,10 +71,7 @@ class Catalog:
         category = category.strip().casefold()
         book_ids = self._category_index.get(category, [])
 
-        return [
-            self._items[item_id]
-            for item_id in book_ids
-        ]
+        return [self._items[item_id] for item_id in book_ids]
 
     def find_by_name(self, query: str) -> list[Book]:
         """Find books by a case-insensitive name substring."""
@@ -91,11 +83,7 @@ class Catalog:
         if not query:
             return []
 
-        return [
-            book
-            for book in self._items.values()
-            if query in book.name.casefold()
-        ]
+        return [book for book in self._items.values() if query in book.name.casefold()]
 
     def __len__(self) -> int:
         """Return the number of books in the catalog."""
@@ -124,9 +112,7 @@ class Catalog:
     def undo(self) -> None:
         """Undo the last operation outside a transaction."""
         if self._transaction_active:
-            raise CatalogError(
-                "Нельзя вызывать undo() внутри транзакции"
-            )
+            raise CatalogError("Нельзя вызывать undo() внутри транзакции")
 
         self._undo_last()
 
@@ -151,9 +137,7 @@ class Catalog:
     def transaction(self) -> Iterator["Catalog"]:
         """Commit catalog changes or roll them back on failure."""
         if self._transaction_active:
-            raise CatalogError(
-                "Вложенные транзакции не поддерживаются"
-            )
+            raise CatalogError("Вложенные транзакции не поддерживаются")
 
         self._transaction_active = True
         checkpoint = len(self._undo_stack)
